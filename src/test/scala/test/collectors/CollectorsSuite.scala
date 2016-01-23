@@ -12,7 +12,7 @@ class CollectorsSuite extends FlatSpec {
   def source = Source.fromFile(sourcePath)
 
   "allTraces" should "produce some traces" in {
-    assert(new TraceCollector(source).allTraces().size > 0)
+    assert(new TraceCollector(source).allTraces.size > 0)
   }
   "collectSQLAsString" should "produce some traces" in {
     val extracted = new TraceCollector(source).collectSQLAsString()
