@@ -23,6 +23,6 @@ class MainUI extends UI(theme = ValoTheme.ThemeName) {
       margin = false
       spacing = false
       add(new LogView)
-    }), Alignment.TopCenter)
+    }), Alignment.TopLeft)
   }
 }

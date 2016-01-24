@@ -26,6 +26,14 @@ import vaadin.scala.ScaladinWrapper
 import vaadin.scala.mixins.ComponentMixin
 import vaadin.scala.Alignment
 import org.sarrufat.curam.log.analizer.Statement
+import vaadin.scala.MenuBar
+import vaadin.scala.MenuBar.MenuItem
+import vaadin.scala.Window
+import vaadin.scala.TwinColSelect
+import vaadin.scala.UI
+import vaadin.scala.Button
+import java.util.HashSet
+import org.sarrufat.curam.log.analizer.SqlStatement
 
 class LogDropBox(val comp: Component, val showSql: (Source) ⇒ Unit) extends DragAndDropWrapper(comp) with DropHandler with ComponentMixin {
   class StreamV extends StreamVariable {
@@ -74,16 +82,66 @@ class LogView extends VerticalLayout {
   components += dropBox
   setAlignment(dropBox, Alignment.TopLeft)
   def showSql(source: Source): Unit = {
+    val sqldata = new TraceCollector(source).collectSQL()
+    var currentFilteredTable: Seq[String] = Seq()
     val tab = new Table {
       sizeFull
-      container = new BeanItemContainer(new TraceCollector(source).collectSQL())
-      visibleColumns = Seq("seq", "date", "stype", "table")
-      itemDescriptionGenerator = { itemDesc ⇒
-        itemDesc.itemId.asInstanceOf[Statement].statement
+      doFilters()
+      sortable = false
+      def doFilters() = {
+        container = new BeanItemContainer(sqldata.filter { s ⇒ currentFilteredTable.find { _ == s.table } == None })
+        visibleColumns = Seq("seq", "date", "stype", "table", "numberrows", "wherecond")
+        columnHeaders = Seq("Line", "Date", "Statement", "Table", "#Rows", "Condition")
+        itemDescriptionGenerator = { itemDesc ⇒
+          itemDesc.propertyId match {
+            case "wherecond" ⇒ itemDesc.itemId.asInstanceOf[SqlStatement].wherecond
+            case _           ⇒ itemDesc.itemId.asInstanceOf[Statement].statement
+          }
+        }
+        styleNames += "wordwrap-table"
+        setColumnWidth("wherecond", 300)
       }
     }
+    components += menuBar()
     components += tab
-    setAlignment(dropBox, Alignment.TopCenter)
+    components -= dropBox
+    def menuBar() = {
+      def selectTableFilter() = {
+        val window = new Window {
+          caption = "Table selection"
+          width = 600 px;
+          val thisWindow = this
+          import collection.JavaConversions._
+          content = new VerticalLayout {
+            components += new TwinColSelect {
+              caption = "Select tables to exclude from view"
+              TraceCollector.getTableList(sqldata).foreach { addItem(_) }
+              val selected = new HashSet[String](currentFilteredTable)
+              value = selected
+              valueChangeListeners += { event ⇒
+                //                println(event.property.value)
+                currentFilteredTable = Seq()
+                event.property.value.foreach { x ⇒
+                  val set = x.asInstanceOf[java.util.Set[String]]
+                  currentFilteredTable = set.toSeq
+                }
+                tab.doFilters()
+              }
+              immediate = true
+            }
+            components += Button("Select", click ⇒ { UI.current.windows -= thisWindow })
+          }
 
+        }
+        UI.current.windows += window
+      }
+      val mbar = new MenuBar {
+        width = 300 px
+      }
+      val item1 = mbar.addItem("Filters")
+      item1.addItem("Exclude tables", item ⇒ selectTableFilter())
+      mbar
+    }
   }
+
 }

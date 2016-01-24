@@ -18,15 +18,31 @@ trait Statement {
 trait SqlStatement extends Statement {
   @BeanProperty
   val table: String = ""
+  @BeanProperty
+  lazy val numberrows = 0
+  @BeanProperty
+  val wherecond = ""
 }
 
 case class SqlSelect(override val statement: String, override val date: String, override val seq: Int) extends SqlStatement {
   var rows: Option[SqlNRows] = None
   override val table: String = {
     val regex = """SELECT.*FROM (\w+).*""".r
+    val leftOuter = """SELECT.*FROM (\w+).*LEFT OUTER JOIN (\w+).*""".r
     statement match {
-      case regex(t) ⇒ t
-      case _        ⇒ ""
+      case leftOuter(t, l) ⇒ t + "," + l
+      case regex(t)        ⇒ t
+      case _               ⇒ ""
+    }
+  }
+  override lazy val numberrows = rows match { case Some(r) ⇒ r.rows; case None ⇒ -1 }
+  override val wherecond: String = {
+    val regex = """SELECT.*FROM .* WHERE (.+)""".r
+    val regex2 = """SELECT.*FROM .* WHERE\((.+)\)""".r
+    statement match {
+      case regex(t)  ⇒ t
+      case regex2(w) ⇒ w
+      case _         ⇒ ""
     }
   }
 }
@@ -64,12 +80,18 @@ case class SqlOther(override val statement: String, override val date: String, o
 
 }
 
+object TraceCollector {
+  def getTableList(statemens: List[SqlStatement]) = {
+    val mapTable = statemens.groupBy { _.table }
+    mapTable.map(_._1).toSeq.sorted
+  }
+}
 class TraceCollector(val source: Source) {
   lazy val allTraces: List[(String, Int)] = {
     val all = (for {
       line ← source.getLines()
 
-    } yield line).toList.zipWithIndex
+    } yield line).toList.zipWithIndex.map(t ⇒ (t._1, t._2 + 1))
     all.filter(_._1.contains("Trace"))
   }
 
@@ -113,6 +135,6 @@ class TraceCollector(val source: Source) {
         case r: SqlNRows ⇒ sel.rows = Some(r)
       }
     }
-    res
+    res.filterNot { x ⇒ x match { case n: SqlNRows ⇒ true; case _ ⇒ false } }
   }
 }
