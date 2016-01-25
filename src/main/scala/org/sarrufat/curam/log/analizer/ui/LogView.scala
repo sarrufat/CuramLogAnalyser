@@ -34,6 +34,8 @@ import vaadin.scala.UI
 import vaadin.scala.Button
 import java.util.HashSet
 import org.sarrufat.curam.log.analizer.SqlStatement
+import vaadin.scala.SelectionMode
+import vaadin.scala.ComboBox
 
 class LogDropBox(val comp: Component, val showSql: (Source) ⇒ Unit) extends DragAndDropWrapper(comp) with DropHandler with ComponentMixin {
   class StreamV extends StreamVariable {
@@ -88,6 +90,7 @@ class LogView extends VerticalLayout {
       sizeFull
       doFilters()
       sortable = false
+      selectionMode = SelectionMode.Multi
       def doFilters() = {
         container = new BeanItemContainer(sqldata.filter { s ⇒ currentFilteredTable.find { _ == s.table } == None })
         visibleColumns = Seq("seq", "date", "stype", "table", "numberrows", "wherecond")
@@ -101,6 +104,15 @@ class LogView extends VerticalLayout {
         styleNames += "wordwrap-table"
         setColumnWidth("wherecond", 300)
       }
+      var selectedItems: List[SqlStatement] = List()
+      def selectType(typ: String, currentSelectedTables: Seq[String]) = {
+        println(currentSelectedTables)
+        unSelectType()
+        selectedItems = TraceCollector.getByType(sqldata, typ).filter { s ⇒ if (currentSelectedTables.size == 0) true else currentSelectedTables.exists { t ⇒ t == s.table } }
+        selectedItems.foreach { select(_) }
+        if (selectedItems.size > 0) currentPageFirstItemId = selectedItems.head
+      }
+      def unSelectType() = { selectedItems.foreach { unselect(_) } }
     }
     components += menuBar()
     components += tab
@@ -115,6 +127,7 @@ class LogView extends VerticalLayout {
           content = new VerticalLayout {
             components += new TwinColSelect {
               caption = "Select tables to exclude from view"
+              width = 100 percent;
               TraceCollector.getTableList(sqldata).foreach { addItem(_) }
               val selected = new HashSet[String](currentFilteredTable)
               value = selected
@@ -133,6 +146,50 @@ class LogView extends VerticalLayout {
           }
 
         }
+        window.center()
+        UI.current.windows += window
+      }
+      var currentSelectedTables: Seq[String] = Seq()
+      def selectType() = {
+        val window = new Window {
+          caption = "Search type"
+          width = 600 px;
+          val thisWindow = this
+          import collection.JavaConversions._
+          content = new VerticalLayout {
+            val cb = new ComboBox {
+              inputPrompt = "Search type";
+              width = 100 percent;
+              TraceCollector.SQLINSTRUCTIONS.foreach { addItem(_) }
+            }
+            components += cb
+            components += new TwinColSelect {
+              caption = "Select tables to exclude from view"
+              width = 100 percent;
+              TraceCollector.getTableList(sqldata).foreach { addItem(_) }
+              val selected = new HashSet[String](currentSelectedTables)
+              value = selected
+              valueChangeListeners += { event ⇒
+                //                println(event.property.value)
+                currentSelectedTables = Seq()
+                event.property.value.foreach { x ⇒
+                  val set = x.asInstanceOf[java.util.Set[String]]
+                  currentSelectedTables = set.toSeq
+                }
+              }
+              immediate = true
+            }
+
+            components += Button("Search", click ⇒ {
+              UI.current.windows -= thisWindow
+              cb.value match {
+                case Some(v) ⇒ tab.selectType(v.asInstanceOf[String], currentSelectedTables)
+                case None    ⇒ tab.unSelectType()
+              }
+            })
+          }
+        }
+        window.center()
         UI.current.windows += window
       }
       val mbar = new MenuBar {
@@ -140,6 +197,8 @@ class LogView extends VerticalLayout {
       }
       val item1 = mbar.addItem("Filters")
       item1.addItem("Exclude tables", item ⇒ selectTableFilter())
+      val item2 = mbar.addItem("Selection")
+      item2.addItem("Sentence Type", item ⇒ selectType())
       mbar
     }
   }

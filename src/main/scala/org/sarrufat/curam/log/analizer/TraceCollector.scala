@@ -85,7 +85,19 @@ object TraceCollector {
     val mapTable = statemens.groupBy { _.table }
     mapTable.map(_._1).toSeq.sorted
   }
+  val SQLINSTRUCTIONS = Seq("INSERT", "UPDATE", "SELECT", "DELETE")
+
+  def getByType(statemens: List[SqlStatement], typ: String): List[SqlStatement] = {
+    SQLINSTRUCTIONS.indexOf(typ) match {
+      case 0 ⇒ statemens.filter { x ⇒ x match { case s: SqlInsert ⇒ true; case _ ⇒ false } }
+      case 1 ⇒ statemens.filter { x ⇒ x match { case s: SqlUpdate ⇒ true; case _ ⇒ false } }
+      case 2 ⇒ statemens.filter { x ⇒ x match { case s: SqlSelect ⇒ true; case _ ⇒ false } }
+      case 3 ⇒ statemens.filter { x ⇒ x match { case s: SqlDelete ⇒ true; case _ ⇒ false } }
+      case _ ⇒ List()
+    }
+  }
 }
+
 class TraceCollector(val source: Source) {
   lazy val allTraces: List[(String, Int)] = {
     val all = (for {
