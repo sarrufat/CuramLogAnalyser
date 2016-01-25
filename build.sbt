@@ -18,3 +18,7 @@ libraryDependencies ++= Seq(
 )
 
 enablePlugins(TomcatPlugin)
+
+vaadinWebSettings
+
+vaadinThemes  := Seq("tests-valo-facebook")

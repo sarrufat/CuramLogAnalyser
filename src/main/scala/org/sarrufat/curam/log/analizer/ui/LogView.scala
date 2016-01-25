@@ -36,6 +36,9 @@ import java.util.HashSet
 import org.sarrufat.curam.log.analizer.SqlStatement
 import vaadin.scala.SelectionMode
 import vaadin.scala.ComboBox
+import vaadin.scala.HorizontalLayout
+import vaadin.scala.server.FontAwesome
+import scala.util.Try
 
 class LogDropBox(val comp: Component, val showSql: (Source) ⇒ Unit) extends DragAndDropWrapper(comp) with DropHandler with ComponentMixin {
   class StreamV extends StreamVariable {
@@ -87,10 +90,12 @@ class LogView extends VerticalLayout {
     val sqldata = new TraceCollector(source).collectSQL()
     var currentFilteredTable: Seq[String] = Seq()
     val tab = new Table {
+      var totalSetter: Option[String ⇒ Unit] = None
       sizeFull
       doFilters()
       sortable = false
       selectionMode = SelectionMode.Multi
+      styleNames += "small"
       def doFilters() = {
         container = new BeanItemContainer(sqldata.filter { s ⇒ currentFilteredTable.find { _ == s.table } == None })
         visibleColumns = Seq("seq", "date", "stype", "table", "numberrows", "wherecond")
@@ -102,7 +107,7 @@ class LogView extends VerticalLayout {
           }
         }
         styleNames += "wordwrap-table"
-        setColumnWidth("wherecond", 300)
+        setColumnWidth("wherecond", 400)
       }
       var selectedItems: List[SqlStatement] = List()
       def selectType(typ: String, currentSelectedTables: Seq[String]) = {
@@ -110,13 +115,47 @@ class LogView extends VerticalLayout {
         unSelectType()
         selectedItems = TraceCollector.getByType(sqldata, typ).filter { s ⇒ if (currentSelectedTables.size == 0) true else currentSelectedTables.exists { t ⇒ t == s.table } }
         selectedItems.foreach { select(_) }
-        if (selectedItems.size > 0) currentPageFirstItemId = selectedItems.head
+        if (selectedItems.size > 0) currentPageFirstItemId = selectedItems.head else currentPageFirstItemId = None
+        totalSetter.foreach(_("Found: " + selectedItems.size))
+      }
+      def netxSelect() = {
+        selectedItems match {
+          case List() ⇒ currentPageFirstItemId = None
+          case _ ⇒ currentPageFirstItemId.foreach { id ⇒
+            Try(currentPageFirstItemId = selectedItems(selectedItems.indexOf(id) + 1)).getOrElse(currentPageFirstItemId = selectedItems.head)
+          }
+        }
+      }
+      def prevSelect() = {
+        selectedItems match {
+          case List() ⇒ currentPageFirstItemId = None
+          case _ ⇒ currentPageFirstItemId.foreach { id ⇒
+            Try(currentPageFirstItemId = selectedItems(selectedItems.indexOf(id) - 1)).getOrElse(currentPageFirstItemId = selectedItems.last)
+          }
+        }
       }
       def unSelectType() = { selectedItems.foreach { unselect(_) } }
     }
-    components += menuBar()
+    components += menuBar();
+    lazy val (c, f) = searchButtons(tab.netxSelect, tab.prevSelect)
+    tab.totalSetter = Some(f)
+    components += c
     components += tab
     components -= dropBox
+    def searchButtons(next: ⇒ Unit, prev: ⇒ Unit) = {
+      val lab = Label("")
+      (new HorizontalLayout {
+        spacing = true
+        val left = Button(FontAwesome.ArrowLeft.html, prev)
+        left.htmlContentAllowed = true
+        components += left
+        val right = Button(FontAwesome.ArrowRight.html, next)
+        right.htmlContentAllowed = true
+        components += right
+        components += lab
+      },
+        { total: String ⇒ lab.caption = total })
+    }
     def menuBar() = {
       def selectTableFilter() = {
         val window = new Window {
@@ -164,7 +203,7 @@ class LogView extends VerticalLayout {
             }
             components += cb
             components += new TwinColSelect {
-              caption = "Select tables to exclude from view"
+              caption = "Select tables"
               width = 100 percent;
               TraceCollector.getTableList(sqldata).foreach { addItem(_) }
               val selected = new HashSet[String](currentSelectedTables)
