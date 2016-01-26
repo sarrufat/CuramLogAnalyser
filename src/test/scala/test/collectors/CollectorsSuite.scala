@@ -25,9 +25,9 @@ class CollectorsSuite extends FlatSpec {
   }
   "collectSQL tables" should "produce tablenames" in {
     val extracted = new TraceCollector(source).collectSQL()
-    assert(extracted.size > 0 && extracted.exists { _.table != "" })
+    assert(extracted.size > 0 && extracted.exists { _.tables.size > 0 })
     val someSql = extracted.filterNot { _ match { case r: SqlNRows ⇒ true; case o: SqlOther ⇒ true; case _ ⇒ false } }
-    assert(someSql.forall { _.table != "" })
+    assert(someSql.forall { _.tables.size > 0 })
   }
 
 }

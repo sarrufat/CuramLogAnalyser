@@ -96,10 +96,11 @@ class LogView extends VerticalLayout {
       sortable = false
       selectionMode = SelectionMode.Multi
       styleNames += "small"
+      width = 100 percent
       def doFilters() = {
-        container = new BeanItemContainer(sqldata.filter { s ⇒ currentFilteredTable.find { _ == s.table } == None })
-        visibleColumns = Seq("seq", "date", "stype", "table", "numberrows", "wherecond")
-        columnHeaders = Seq("Line", "Date", "Statement", "Table", "#Rows", "Condition")
+        container = new BeanItemContainer(sqldata.filter { s ⇒ currentFilteredTable.find { cur ⇒ s.tables.exists { x ⇒ x == cur } } == None })
+        visibleColumns = Seq("seq", "date", "stype", "stables", "numberrows", "wherecond")
+        columnHeaders = Seq("Line", "Date", "Statement", "Tables", "#Rows", "Condition")
         itemDescriptionGenerator = { itemDesc ⇒
           itemDesc.propertyId match {
             case "wherecond" ⇒ itemDesc.itemId.asInstanceOf[SqlStatement].wherecond
@@ -113,7 +114,7 @@ class LogView extends VerticalLayout {
       def selectType(typ: String, currentSelectedTables: Seq[String]) = {
         println(currentSelectedTables)
         unSelectType()
-        selectedItems = TraceCollector.getByType(sqldata, typ).filter { s ⇒ if (currentSelectedTables.size == 0) true else currentSelectedTables.exists { t ⇒ t == s.table } }
+        selectedItems = TraceCollector.getByType(sqldata, typ).filter { s ⇒ if (currentSelectedTables.size == 0) true else currentSelectedTables.exists { t ⇒ s.tables.exists { x ⇒ x == t } } }
         selectedItems.foreach { select(_) }
         if (selectedItems.size > 0) currentPageFirstItemId = selectedItems.head else currentPageFirstItemId = None
         totalSetter.foreach(_("Found: " + selectedItems.size))

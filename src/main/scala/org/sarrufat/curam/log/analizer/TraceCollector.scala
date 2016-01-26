@@ -16,8 +16,10 @@ trait Statement {
   val stype: String = itype
 }
 trait SqlStatement extends Statement {
+
+  val tables: Seq[String] = Seq()
   @BeanProperty
-  val table: String = ""
+  lazy val stables = tables.mkString(",")
   @BeanProperty
   lazy val numberrows = 0
   @BeanProperty
@@ -26,13 +28,30 @@ trait SqlStatement extends Statement {
 
 case class SqlSelect(override val statement: String, override val date: String, override val seq: Int) extends SqlStatement {
   var rows: Option[SqlNRows] = None
-  override val table: String = {
+  override val tables: Seq[String] = {
     val regex = """SELECT.*FROM (\w+).*""".r
     val leftOuter = """SELECT.*FROM (\w+).*LEFT OUTER JOIN (\w+).*""".r
+    val two = """SELECT.*FROM (\w+) , (\w+).*""".r
+    val three = """SELECT.*FROM (\w+) , (\w+) , (\w+).*""".r
+    val four = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+).*""".r
+    val five = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+) , (\w+).*""".r
+    val six = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+).*""".r
+    val seven = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+).*""".r
+    val eight = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+).*""".r
+    val nine = """SELECT.*FROM (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+) , (\w+).*""".r
+
     statement match {
-      case leftOuter(t, l) ⇒ t + "," + l
-      case regex(t)        ⇒ t
-      case _               ⇒ ""
+      case nine(s1, s2, s3, s4, s5, s6, s7, s8, s9) ⇒ Seq(s1, s2, s3, s4, s5, s6, s7, s8, s9)
+      case eight(s1, s2, s3, s4, s5, s6, s7, s8)    ⇒ Seq(s1, s2, s3, s4, s5, s6, s7, s8)
+      case seven(s1, s2, s3, s4, s5, s6, s7)        ⇒ Seq(s1, s2, s3, s4, s5, s6, s7)
+      case six(s1, s2, s3, s4, s5, s6)              ⇒ Seq(s1, s2, s3, s4, s5, s6)
+      case five(s1, s2, s3, s4, s5)                 ⇒ Seq(s1, s2, s3, s4, s5)
+      case four(s1, s2, s3, s4)                     ⇒ Seq(s1, s2, s3, s4)
+      case three(s1, s2, s3)                        ⇒ Seq(s1, s2, s3)
+      case two(s1, s2)                              ⇒ Seq(s1, s2)
+      case leftOuter(t, l)                          ⇒ Seq(t, l)
+      case regex(t)                                 ⇒ Seq(t)
+      case _                                        ⇒ Seq()
     }
   }
   override lazy val numberrows = rows match { case Some(r) ⇒ r.rows; case None ⇒ -1 }
@@ -47,30 +66,30 @@ case class SqlSelect(override val statement: String, override val date: String, 
   }
 }
 case class SqlInsert(override val statement: String, override val date: String, override val seq: Int) extends SqlStatement {
-  override val table: String = {
+  override val tables: Seq[String] = {
     val regex = """INSERT INTO (\w+).*""".r
     statement match {
-      case regex(t) ⇒ t
-      case _        ⇒ ""
+      case regex(t) ⇒ Seq(t)
+      case _        ⇒ Seq()
     }
   }
 }
 
 case class SqlUpdate(override val statement: String, override val date: String, override val seq: Int) extends SqlStatement {
-  override val table: String = {
+  override val tables: Seq[String] = {
     val regex = """UPDATE (\w+).*""".r
     statement match {
-      case regex(t) ⇒ t
-      case _        ⇒ ""
+      case regex(t) ⇒ Seq(t)
+      case _        ⇒ Seq()
     }
   }
 }
 case class SqlDelete(override val statement: String, override val date: String, override val seq: Int) extends SqlStatement {
-  override val table: String = {
+  override val tables: Seq[String] = {
     val regex = """DELETE FROM (\w+).*""".r
     statement match {
-      case regex(t) ⇒ t
-      case _        ⇒ ""
+      case regex(t) ⇒ Seq(t)
+      case _        ⇒ Seq()
     }
   }
 }
@@ -81,12 +100,8 @@ case class SqlOther(override val statement: String, override val date: String, o
 }
 
 object TraceCollector {
-  def getTableList(statemens: List[SqlStatement]) = {
-    val mapTable = statemens.groupBy { _.table }
-    mapTable.map(_._1).toSeq.sorted
-  }
+  def getTableList(statemens: List[SqlStatement]) = statemens.flatMap(_.tables).groupBy { x ⇒ x }.map(_._1).toList.sorted
   val SQLINSTRUCTIONS = Seq("INSERT", "UPDATE", "SELECT", "DELETE")
-
   def getByType(statemens: List[SqlStatement], typ: String): List[SqlStatement] = {
     SQLINSTRUCTIONS.indexOf(typ) match {
       case 0 ⇒ statemens.filter { x ⇒ x match { case s: SqlInsert ⇒ true; case _ ⇒ false } }
