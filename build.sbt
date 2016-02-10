@@ -19,6 +19,9 @@ libraryDependencies ++= Seq(
 
 enablePlugins(TomcatPlugin)
 
+containerPort := 9090
+
+
 vaadinWebSettings
 
 vaadinThemes  := Seq("tests-valo-facebook")
