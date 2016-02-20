@@ -102,13 +102,16 @@ case class SqlOther(override val statement: String, override val date: String, o
 object TraceCollector {
   def getTableList(statemens: List[SqlStatement]) = statemens.flatMap(_.tables).groupBy { x ⇒ x }.map(_._1).toList.sorted
   val SQLINSTRUCTIONS = Seq("INSERT", "UPDATE", "SELECT", "DELETE")
-  def getByType(statemens: List[SqlStatement], typ: String): List[SqlStatement] = {
-    SQLINSTRUCTIONS.indexOf(typ) match {
-      case 0 ⇒ statemens.filter { x ⇒ x match { case s: SqlInsert ⇒ true; case _ ⇒ false } }
-      case 1 ⇒ statemens.filter { x ⇒ x match { case s: SqlUpdate ⇒ true; case _ ⇒ false } }
-      case 2 ⇒ statemens.filter { x ⇒ x match { case s: SqlSelect ⇒ true; case _ ⇒ false } }
-      case 3 ⇒ statemens.filter { x ⇒ x match { case s: SqlDelete ⇒ true; case _ ⇒ false } }
-      case _ ⇒ List()
+  def getByType(statemens: List[SqlStatement], otyp: Option[String]): List[SqlStatement] = {
+    otyp match {
+      case Some(typ) ⇒ SQLINSTRUCTIONS.indexOf(typ) match {
+        case 0 ⇒ statemens.filter { x ⇒ x match { case s: SqlInsert ⇒ true; case _ ⇒ false } }
+        case 1 ⇒ statemens.filter { x ⇒ x match { case s: SqlUpdate ⇒ true; case _ ⇒ false } }
+        case 2 ⇒ statemens.filter { x ⇒ x match { case s: SqlSelect ⇒ true; case _ ⇒ false } }
+        case 3 ⇒ statemens.filter { x ⇒ x match { case s: SqlDelete ⇒ true; case _ ⇒ false } }
+        case _ ⇒ List()
+      }
+      case None ⇒ statemens
     }
   }
 }

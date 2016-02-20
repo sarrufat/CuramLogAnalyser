@@ -111,7 +111,7 @@ class LogView extends VerticalLayout {
         setColumnWidth("wherecond", 400)
       }
       var selectedItems: List[SqlStatement] = List()
-      def selectType(typ: String, currentSelectedTables: Seq[String]) = {
+      def selectType(typ: Option[String], currentSelectedTables: Seq[String]) = {
         println(currentSelectedTables)
         unSelectType()
         selectedItems = TraceCollector.getByType(sqldata, typ).filter { s ⇒ if (currentSelectedTables.size == 0) true else currentSelectedTables.exists { t ⇒ s.tables.exists { x ⇒ x == t } } }
@@ -143,104 +143,104 @@ class LogView extends VerticalLayout {
     components += c
     components += tab
     components -= dropBox
-    def searchButtons(next: ⇒ Unit, prev: ⇒ Unit) = {
-      val lab = Label("")
-      (new HorizontalLayout {
-        spacing = true
-        val left = Button(FontAwesome.ArrowLeft.html, prev)
-        left.htmlContentAllowed = true
-        components += left
-        val right = Button(FontAwesome.ArrowRight.html, next)
-        right.htmlContentAllowed = true
-        components += right
-        components += lab
-      },
-        { total: String ⇒ lab.caption = total })
-    }
-    def menuBar() = {
-      def selectTableFilter() = {
-        val window = new Window {
-          caption = "Table selection"
-          width = 600 px;
-          val thisWindow = this
-          import collection.JavaConversions._
-          content = new VerticalLayout {
-            components += new TwinColSelect {
-              caption = "Select tables to exclude from view"
-              width = 100 percent;
-              TraceCollector.getTableList(sqldata).foreach { addItem(_) }
-              val selected = new HashSet[String](currentFilteredTable)
-              value = selected
-              valueChangeListeners += { event ⇒
-                //                println(event.property.value)
-                currentFilteredTable = Seq()
-                event.property.value.foreach { x ⇒
-                  val set = x.asInstanceOf[java.util.Set[String]]
-                  currentFilteredTable = set.toSeq
+      def searchButtons(next: ⇒ Unit, prev: ⇒ Unit) = {
+        val lab = Label("")
+        (new HorizontalLayout {
+          spacing = true
+          val left = Button(FontAwesome.ArrowLeft.html, prev)
+          left.htmlContentAllowed = true
+          components += left
+          val right = Button(FontAwesome.ArrowRight.html, next)
+          right.htmlContentAllowed = true
+          components += right
+          components += lab
+        },
+          { total: String ⇒ lab.caption = total })
+      }
+      def menuBar() = {
+          def selectTableFilter() = {
+            val window = new Window {
+              caption = "Table selection"
+              width = 600 px;
+              val thisWindow = this
+              import collection.JavaConversions._
+              content = new VerticalLayout {
+                components += new TwinColSelect {
+                  caption = "Select tables to exclude from view"
+                  width = 100 percent;
+                  TraceCollector.getTableList(sqldata).foreach { addItem(_) }
+                  val selected = new HashSet[String](currentFilteredTable)
+                  value = selected
+                  valueChangeListeners += { event ⇒
+                    //                println(event.property.value)
+                    currentFilteredTable = Seq()
+                    event.property.value.foreach { x ⇒
+                      val set = x.asInstanceOf[java.util.Set[String]]
+                      currentFilteredTable = set.toSeq
+                    }
+                    tab.doFilters()
+                  }
+                  immediate = true
                 }
-                tab.doFilters()
+                components += Button("Select", click ⇒ { UI.current.windows -= thisWindow })
               }
-              immediate = true
-            }
-            components += Button("Select", click ⇒ { UI.current.windows -= thisWindow })
-          }
 
-        }
-        window.center()
-        UI.current.windows += window
-      }
-      var currentSelectedTables: Seq[String] = Seq()
-      def selectType() = {
-        val window = new Window {
-          caption = "Search type"
-          width = 600 px;
-          val thisWindow = this
-          import collection.JavaConversions._
-          content = new VerticalLayout {
-            val cb = new ComboBox {
-              inputPrompt = "Search type";
-              width = 100 percent;
-              TraceCollector.SQLINSTRUCTIONS.foreach { addItem(_) }
             }
-            components += cb
-            components += new TwinColSelect {
-              caption = "Select tables"
-              width = 100 percent;
-              TraceCollector.getTableList(sqldata).foreach { addItem(_) }
-              val selected = new HashSet[String](currentSelectedTables)
-              value = selected
-              valueChangeListeners += { event ⇒
-                //                println(event.property.value)
-                currentSelectedTables = Seq()
-                event.property.value.foreach { x ⇒
-                  val set = x.asInstanceOf[java.util.Set[String]]
-                  currentSelectedTables = set.toSeq
+            window.center()
+            UI.current.windows += window
+          }
+        var currentSelectedTables: Seq[String] = Seq()
+          def selectType() = {
+            val window = new Window {
+              caption = "Search type"
+              width = 600 px;
+              val thisWindow = this
+              import collection.JavaConversions._
+              content = new VerticalLayout {
+                val cb = new ComboBox {
+                  inputPrompt = "Search type";
+                  width = 100 percent;
+                  TraceCollector.SQLINSTRUCTIONS.foreach { addItem(_) }
                 }
-              }
-              immediate = true
-            }
+                components += cb
+                components += new TwinColSelect {
+                  caption = "Select tables"
+                  width = 100 percent;
+                  TraceCollector.getTableList(sqldata).foreach { addItem(_) }
+                  val selected = new HashSet[String](currentSelectedTables)
+                  value = selected
+                  valueChangeListeners += { event ⇒
+                    //                println(event.property.value)
+                    currentSelectedTables = Seq()
+                    event.property.value.foreach { x ⇒
+                      val set = x.asInstanceOf[java.util.Set[String]]
+                      currentSelectedTables = set.toSeq
+                    }
+                  }
+                  immediate = true
+                }
 
-            components += Button("Search", click ⇒ {
-              UI.current.windows -= thisWindow
-              cb.value match {
-                case Some(v) ⇒ tab.selectType(v.asInstanceOf[String], currentSelectedTables)
-                case None    ⇒ tab.unSelectType()
+                components += Button("Search", click ⇒ {
+                  UI.current.windows -= thisWindow
+                  cb.value match {
+                    case Some(v) ⇒ tab.selectType(Option(v.asInstanceOf[String]), currentSelectedTables)
+                    case None    ⇒ if (currentSelectedTables.isEmpty) tab.unSelectType() else tab.selectType(None, currentSelectedTables)
+                  }
+                })
               }
-            })
+            }
+            window.center()
+            UI.current.windows += window
           }
+        val mbar = new MenuBar {
+          width = 300 px
         }
-        window.center()
-        UI.current.windows += window
+        val item1 = mbar.addItem("Filters")
+        item1.addItem("Exclude tables", item ⇒ selectTableFilter())
+        val item2 = mbar.addItem("Selection")
+        item2.addItem("Sentence Type", item ⇒ selectType())
+        mbar
       }
-      val mbar = new MenuBar {
-        width = 300 px
-      }
-      val item1 = mbar.addItem("Filters")
-      item1.addItem("Exclude tables", item ⇒ selectTableFilter())
-      val item2 = mbar.addItem("Selection")
-      item2.addItem("Sentence Type", item ⇒ selectType())
-      mbar
-    }
   }
 
 }
